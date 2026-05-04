@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoApp — Scan & Earn</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #1D9E75;
+    --green-light: #E1F5EE;
+    --green-dark: #085041;
+    --amber: #EF9F27;
+    --amber-light: #FAEEDA;
+    --amber-dark: #633806;
+    --coral: #D85A30;
+    --coral-light: #FAECE7;
+    --teal: #0F6E56;
+    --gray-100: #f8f7f4;
+    --gray-200: #eeede8;
+    --gray-400: #888780;
+    --gray-700: #3a3a38;
+    --white: #ffffff;
+    --text: #1a1a18;
+    --text-muted: #6b6a65;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--gray-100);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    background: var(--green-dark);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    color: var(--white);
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--amber); }
+
+  .wallet-badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 50px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .wallet-badge .coin { color: var(--amber); font-size: 18px; }
+
+  main {
+    width: 100%;
+    max-width: 480px;
+    padding: 24px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .screen { display: none; flex-direction: column; gap: 16px; animation: fadeUp .35s ease; }
+  .screen.active { display: flex; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray-200);
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  p.subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .scanner-box {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #111;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #interactive { width: 100%; height: 100%; position: relative; }
+  #interactive video { width: 100%; height: 100%; object-fit: cover; }
+  #interactive canvas { display: none; }
+
+  .scanner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .scan-frame {
+    width: 200px;
+    height: 120px;
+    border: 2px solid var(--amber);
+    border-radius: 8px;
+    position: relative;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.4);
+  }
+
+  .scan-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--amber), transparent);
+    top: 0;
+    animation: scanAnim 1.8s linear infinite;
+  }
+  @keyframes scanAnim {
+    0% { top: 0; }
+    100% { top: calc(100% - 2px); }
+  }
+
+  .scanner-hint {
+    color: white;
+    font-size: 12px;
+    margin-top: 12px;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 12px;
+    border-radius: 50px;
+  }
+
+  .manual-section { display: flex; flex-direction: column; gap: 10px; }
+  .manual-section label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    background: var(--gray-100);
+    transition: border-color .2s;
+    outline: none;
+    letter-spacing: 1px;
+  }
+  input:focus { border-color: var(--green); background: white; }
+
+  .btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--green); color: white; }
+  .btn-primary:hover { background: var(--teal); }
+  .btn-outline { background: transparent; color: var(--text-muted); border: 1.5px solid var(--gray-200); }
+  .btn-outline:hover { border-color: var(--gray-400); color: var(--text); }
+  .btn-amber { background: var(--amber); color: var(--amber-dark); }
+  .btn-amber:hover { background: #d88f22; }
+
+  .result-product {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: var(--green-light);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(29, 158, 117, 0.2);
+  }
+
+  .product-icon {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    background: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  .product-info h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--green-dark); }
+  .product-info p { font-size: 13px; color: var(--teal); margin-top: 2px; }
+
+  .value-display {
+    text-align: center;
+    padding: 24px;
+    background: var(--amber-light);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(239, 159, 39, 0.25);
+  }
+
+  .value-label { font-size: 13px; color: var(--amber-dark); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; margin-bottom: 4px; }
+  .value-amount { font-family: 'Syne', sans-serif; font-size: 42px; font-weight: 800; color: var(--amber-dark); line-height: 1; }
+  .value-sub { font-size: 13px; color: var(--amber-dark); margin-top: 4px; opacity: 0.75; }
+  .btn-row { display: flex; flex-direction: column; gap: 10px; }
+
+  .machine-card {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px;
+    background: var(--white);
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--gray-200);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .machine-card:hover, .machine-card.selected { border-color: var(--green); background: var(--green-light); }
+  .machine-icon { width: 44px; height: 44px; border-radius: 10px; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .machine-info { flex: 1; }
+  .machine-name { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 15px; color: var(--text); }
+  .machine-address { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .machine-dist { font-size: 12px; font-weight: 600; color: var(--green); white-space: nowrap; padding: 4px 10px; background: var(--green-light); border-radius: 50px; }
+  .nearest-badge { font-size: 10px; background: var(--green); color: white; padding: 2px 8px; border-radius: 50px; display: inline-block; margin-top: 4px; font-weight: 500; }
+
+  input.code-input { letter-spacing: 4px; text-align: center; font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; text-transform: uppercase; background: white; }
+
+  .validation-result { text-align: center; padding: 24px; border-radius: var(--radius-sm); display: none; }
+  .validation-result.show { display: block; animation: fadeUp .3s ease; }
+  .validation-result.success { background: var(--green-light); border: 1px solid rgba(29,158,117,0.2); }
+  .validation-result.error { background: var(--coral-light); border: 1px solid rgba(216,90,48,0.2); }
+  .validation-icon { font-size: 48px; margin-bottom: 8px; }
+  .validation-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .validation-result.success .validation-title { color: var(--green-dark); }
+  .validation-result.error .validation-title { color: var(--coral); }
+  .validation-msg { font-size: 14px; color: var(--text-muted); }
+  .validation-result.success .validation-msg { color: var(--teal); }
+
+  .balance-header { background: var(--green-dark); border-radius: var(--radius); padding: 24px; color: white; display: flex; align-items: center; justify-content: space-between; }
+  .balance-label { font-size: 13px; opacity: 0.75; margin-bottom: 4px; }
+  .balance-value { font-family: 'Syne', sans-serif; font-size: 38px; font-weight: 800; color: var(--amber); }
+
+  .store-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .store-item { background: white; border-radius: var(--radius-sm); border: 1.5px solid var(--gray-200); padding: 16px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: all .2s; }
+  .store-item:hover { border-color: var(--amber); }
+  .store-item.redeemed { opacity: 0.5; pointer-events: none; }
+  .store-emoji { font-size: 32px; }
+  .store-name { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); }
+  .store-brand { font-size: 12px; color: var(--text-muted); }
+  .store-price { font-weight: 700; font-size: 16px; color: var(--amber-dark); display: flex; align-items: center; gap: 4px; }
+  .store-price-label { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .btn-redeem { background: var(--amber-light); border: 1px solid rgba(239,159,39,0.3); color: var(--amber-dark); border-radius: 8px; padding: 8px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .btn-redeem:hover { background: var(--amber); color: var(--amber-dark); }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-top: 1px solid var(--gray-200); display: flex; justify-content: space-around; padding: 8px 0 16px; z-index: 50; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 20px; border-radius: var(--radius-sm); transition: all .2s; border: none; background: none; font-family: 'DM Sans', sans-serif; }
+  .nav-item.active .nav-icon { color: var(--green); }
+  .nav-item.active .nav-label { color: var(--green); font-weight: 600; }
+  .nav-icon { font-size: 22px; color: var(--gray-400); transition: color .2s; }
+  .nav-label { font-size: 10px; color: var(--gray-400); transition: color .2s; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--green-dark); color: white; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 500; opacity: 0; transition: all .35s; pointer-events: none; white-space: nowrap; z-index: 999; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .loader { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; color: var(--text-muted); font-size: 14px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--gray-200); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .divider { height: 1px; background: var(--gray-200); margin: 4px 0; }
+  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+  .info-label { font-size: 13px; color: var(--text-muted); }
+  .info-value { font-size: 14px; font-weight: 500; color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Eco<span>App</span></div>
+  <div class="wallet-badge">
+    <span class="coin">●</span>
+    <span id="header-balance">$0</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- SCREEN 1: SCANNER -->
+  <div class="screen active" id="screen-scan">
+    <div class="card">
+      <h2>Scan your product</h2>
+      <p class="subtitle">Point the camera at the barcode of your recyclable product</p>
+    </div>
+
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="scanner-box">
+        <div id="interactive"></div>
+        <div class="scanner-overlay">
+          <div class="scan-frame"><div class="scan-line"></div></div>
+          <span class="scanner-hint">Align the barcode within the frame</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="manual-section">
+        <label>Or enter the code manually</label>
+        <input type="text" id="manual-barcode" placeholder="e.g. 7702067000237" maxlength="20">
+        <button class="btn btn-primary" onclick="processBarcode(document.getElementById('manual-barcode').value)">
+          🔍 Scan code
+        </button>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--green-light); border-color:rgba(29,158,117,0.2);">
+      <p class="section-title" style="margin-bottom:8px;">Highest value products</p>
+      <div class="info-row">
+        <span class="info-label">♻️ PET bottle 500ml</span>
+        <span class="info-value" style="color:var(--green);">+$150</span>
+      </div>
+      <div class="divider"></div>
+      <div class="info-row">
+        <span class="info-label">🥤 Aluminum can</span>
+        <span class="info-value" style="color:var(--green);">+$200</span>
+      </div>
+      <div class="divider"></div>
+      <div class="info-row">
+        <span class="info-label">📦 Clean cardboard</span>
+        <span class="info-value" style="color:var(--green);">+$80</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: SCAN RESULT -->
+  <div class="screen" id="screen-result">
+    <div class="card">
+      <h2>Product found!</h2>
+      <p class="subtitle">Here is the value generated by your recycled product</p>
+    </div>
+
+    <div class="card">
+      <div class="result-product">
+        <div class="product-icon" id="result-icon">♻️</div>
+        <div class="product-info">
+          <h3 id="result-name">PET Bottle</h3>
+          <p id="result-category">Plastic · Code: 7702067000237</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="value-display">
+        <div class="value-label">Value generated</div>
+        <div class="value-amount" id="result-value">$150</div>
+        <div class="value-sub">Redeemable credits at partner stores</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="section-title" style="margin-bottom:12px;">What would you like to do?</p>
+      <div class="btn-row">
+        <button class="btn btn-amber" onclick="goToMachines()">
+          🏧 View redemption machines
+        </button>
+        <button class="btn btn-outline" onclick="cancelar()">
+          ✕ Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: NEARBY MACHINES -->
+  <div class="screen" id="screen-machines">
+    <div class="card">
+      <h2>Nearby machines</h2>
+      <p class="subtitle" id="machines-subtitle">Searching for your location...</p>
+    </div>
+
+    <div id="machines-loader" class="loader">
+      <div class="spinner"></div> Getting your location...
+    </div>
+
+    <div id="machines-list" style="display:none; flex-direction:column; gap:12px;"></div>
+
+    <div class="card" id="machines-actions" style="display:none;">
+      <button class="btn btn-primary" id="btn-select-machine" onclick="selectMachine()" disabled>
+        Continue with selected machine →
+      </button>
+      <button class="btn btn-outline" style="margin-top:10px;" onclick="goBack('screen-result')">
+        ← Go back
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: MACHINE CODE INPUT -->
+  <div class="screen" id="screen-code">
+    <div class="card">
+      <h2>Machine code</h2>
+      <p class="subtitle">The machine displays a unique code. Enter it below to validate your recycling.</p>
+    </div>
+
+    <div class="card">
+      <div class="info-row" style="margin-bottom:12px;">
+        <span class="info-label">📍 Selected machine</span>
+        <span class="info-value" id="selected-machine-name" style="color:var(--green);">—</span>
+      </div>
+      <div class="divider"></div>
+      <div class="info-row">
+        <span class="info-label">💰 Amount to credit</span>
+        <span class="info-value" style="color:var(--amber-dark);" id="code-amount">$0</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="section-title" style="margin-bottom:16px;">Enter the generated code</p>
+      <input type="text" id="machine-code" class="code-input" placeholder="e.g. AB3X9K" maxlength="6"
+        oninput="this.value=this.value.toUpperCase()">
+      <p style="font-size:12px; color:var(--text-muted); margin-top:8px; text-align:center;">
+        6-character alphanumeric code shown on the machine's screen
+      </p>
+    </div>
+
+    <div id="validation-result" class="validation-result"></div>
+
+    <div class="card">
+      <button class="btn btn-primary" onclick="validateCode()">
+        ✓ Validate & credit points
+      </button>
+      <button class="btn btn-outline" style="margin-top:10px;" onclick="goBack('screen-machines')">
+        ← Go back
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: STORE / REDEEM -->
+  <div class="screen" id="screen-store">
+    <div class="balance-header">
+      <div>
+        <div class="balance-label">Your available balance</div>
+        <div class="balance-value" id="store-balance">$0</div>
+        <div style="font-size:12px; opacity:0.6; margin-top:4px;">EcoApp Credits</div>
+      </div>
+      <div style="font-size:48px;">🛒</div>
+    </div>
+
+    <div class="card" style="padding:16px 20px;">
+      <p class="section-title">Redeem at partner supermarkets</p>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <span style="background:var(--green-light);color:var(--green-dark);border-radius:50px;padding:4px 12px;font-size:12px;font-weight:600;">Éxito</span>
+        <span style="background:var(--green-light);color:var(--green-dark);border-radius:50px;padding:4px 12px;font-size:12px;font-weight:600;">Carulla</span>
+        <span style="background:var(--green-light);color:var(--green-dark);border-radius:50px;padding:4px 12px;font-size:12px;font-weight:600;">Jumbo</span>
+        <span style="background:var(--green-light);color:var(--green-dark);border-radius:50px;padding:4px 12px;font-size:12px;font-weight:600;">Olímpica</span>
+        <span style="background:var(--green-light);color:var(--green-dark);border-radius:50px;padding:4px 12px;font-size:12px;font-weight:600;">Metro</span>
+      </div>
+    </div>
+
+    <div class="store-grid" id="store-grid"></div>
+  </div>
+
+</main>
+
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="switchTab('scan')" id="tab-scan">
+    <span class="nav-icon">📷</span>
+    <span class="nav-label">Scan</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('store')" id="tab-store">
+    <span class="nav-icon">🛒</span>
+    <span class="nav-label">Redeem</span>
+  </button>
+  <button class="nav-item" onclick="switchTab('history')" id="tab-history">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">History</span>
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let state = {
+  balance: 0,
+  currentProduct: null,
+  currentValue: 0,
+  selectedMachine: null,
+  validCodes: {},
+  history: [],
+  redeemedItems: []
+};
+
+const PRODUCTS = {
+  '7702067000237': { name: 'Postobón Drink 400ml', icon: '🥤', category: 'PET Plastic', value: 150 },
+  '7706085000014': { name: 'Bavaria Bottle 330ml', icon: '🍺', category: 'Glass', value: 220 },
+  '7702001000012': { name: 'Coca-Cola Can 250ml', icon: '🥫', category: 'Aluminum', value: 200 },
+  '7701234000089': { name: 'Plastic Bottle 1L', icon: '🍶', category: 'PET Plastic', value: 180 },
+  '7708900000034': { name: 'Cereal Cardboard Box', icon: '📦', category: 'Cardboard', value: 80 },
+  '7704567000021': { name: 'Glass Jam Jar', icon: '🫙', category: 'Glass', value: 190 },
+  'DEFAULT':        { name: 'Recyclable product', icon: '♻️', category: 'General recyclable', value: 120 }
+};
+
+const MACHINES_DB = [
+  { id: 1, name: 'Éxito Av. 68', address: 'Av. 68 #38-65, Bogotá', lat: 4.6531, lng: -74.0900 },
+  { id: 2, name: 'Carulla Chapinero', address: 'Cra 13 #54-23, Chapinero', lat: 4.6406, lng: -74.0655 },
+  { id: 3, name: 'Jumbo Gran Estación', address: 'Autopista El Dorado, Gran Estación', lat: 4.6495, lng: -74.1052 },
+  { id: 4, name: 'Olímpica Salitre', address: 'Cra 68D #22-30, Salitre', lat: 4.6576, lng: -74.1001 },
+  { id: 5, name: 'Metro Av. Ciudad de Cali', address: 'Av. Ciudad de Cali #12A-20', lat: 4.6630, lng: -74.1250 },
+  { id: 6, name: 'Éxito Cedritos', address: 'Cra 19 #147-30, Cedritos', lat: 4.7186, lng: -74.0451 },
+];
+
+const STORE_ITEMS = [
+  { id: 's1', emoji: '🍃', name: 'Water Cristal x6', brand: 'Éxito / Carulla', price: 500 },
+  { id: 's2', emoji: '🥛', name: 'Whole milk 1L', brand: 'Jumbo / Olímpica', price: 850 },
+  { id: 's3', emoji: '🍞', name: 'Sliced whole wheat bread', brand: 'Metro / Éxito', price: 700 },
+  { id: 's4', emoji: '🧴', name: 'Shampoo 200ml', brand: 'Carulla / Jumbo', price: 1200 },
+  { id: 's5', emoji: '🫧', name: 'Liquid soap', brand: 'Olímpica / Metro', price: 900 },
+  { id: 's6', emoji: '☕', name: 'Ground coffee 250g', brand: 'Éxito / Carulla', price: 1500 },
+  { id: 's7', emoji: '🍫', name: 'Chocolate Jet', brand: 'Jumbo / Metro', price: 600 },
+  { id: 's8', emoji: '🥫', name: 'Canned tuna', brand: 'Olímpica / Éxito', price: 750 },
+];
+
+let scannerActive = false;
+
+function startScanner() {
+  if (scannerActive || !navigator.mediaDevices) return;
+  scannerActive = true;
+  Quagga.init({
+    inputStream: { name: 'Live', type: 'LiveStream', target: document.querySelector('#interactive'), constraints: { facingMode: 'environment' } },
+    decoder: { readers: ['ean_reader', 'ean_8_reader', 'code_128_reader', 'upc_reader'] }
+  }, err => { if (!err) Quagga.start(); });
+  Quagga.onDetected(data => {
+    const code = data.codeResult.code;
+    Quagga.stop();
+    scannerActive = false;
+    processBarcode(code);
+  });
+}
+
+function processBarcode(code) {
+  code = code.trim();
+  if (!code) { showToast('⚠️ Please enter a valid code'); return; }
+  const product = PRODUCTS[code] || { ...PRODUCTS['DEFAULT'], category: `Code: ${code}` };
+  state.currentProduct = { ...product, code };
+  state.currentValue = product.value;
+  document.getElementById('result-icon').textContent = product.icon;
+  document.getElementById('result-name').textContent = product.name;
+  document.getElementById('result-category').textContent = `${product.category} · Code: ${code}`;
+  document.getElementById('result-value').textContent = `$${product.value.toLocaleString()}`;
+  showScreen('screen-result');
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goBack(screenId) { showScreen(screenId); }
+
+function cancelar() {
+  showScreen('screen-scan');
+  document.getElementById('manual-barcode').value = '';
+  showToast('Operation cancelled');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (tab === 'scan') {
+    showScreen('screen-scan');
+    document.getElementById('tab-scan').classList.add('active');
+    startScanner();
+  } else if (tab === 'store') {
+    showScreen('screen-store');
+    document.getElementById('tab-store').classList.add('active');
+    updateStoreBalance();
+    renderStore();
+  } else {
+    document.getElementById('tab-history').classList.add('active');
+    showToast('📋 Coming soon: recycling history');
+  }
+}
+
+function goToMachines() {
+  showScreen('screen-machines');
+  document.getElementById('machines-loader').style.display = 'flex';
+  document.getElementById('machines-list').style.display = 'none';
+  document.getElementById('machines-actions').style.display = 'none';
+  state.selectedMachine = null;
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => renderMachines(pos.coords.latitude, pos.coords.longitude),
+      () => renderMachines(4.6534, -74.0836),
+      { timeout: 6000 }
+    );
+  } else {
+    setTimeout(() => renderMachines(4.6534, -74.0836), 1000);
+  }
+}
+
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function renderMachines(lat, lng) {
+  const machines = MACHINES_DB.map(m => ({ ...m, dist: getDistance(lat, lng, m.lat, m.lng) })).sort((a, b) => a.dist - b.dist);
+  document.getElementById('machines-loader').style.display = 'none';
+  document.getElementById('machines-subtitle').textContent = `${machines.length} machines available near you`;
+  const list = document.getElementById('machines-list');
+  list.innerHTML = '';
+  machines.forEach((m, i) => {
+    const distText = m.dist < 1000 ? `${Math.round(m.dist)} m` : `${(m.dist/1000).toFixed(1)} km`;
+    const card = document.createElement('div');
+    card.className = 'machine-card';
+    card.id = `machine-${m.id}`;
+    card.innerHTML = `
+      <div class="machine-icon">🏧</div>
+      <div class="machine-info">
+        <div class="machine-name">${m.name}</div>
+        <div class="machine-address">${m.address}</div>
+        ${i === 0 ? '<span class="nearest-badge">Nearest</span>' : ''}
+      </div>
+      <div class="machine-dist">${distText}</div>
+    `;
+    card.onclick = () => selectMachineCard(m, card);
+    list.appendChild(card);
+  });
+  list.style.display = 'flex';
+  document.getElementById('machines-actions').style.display = 'block';
+}
+
+function selectMachineCard(machine, card) {
+  document.querySelectorAll('.machine-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  state.selectedMachine = machine;
+  document.getElementById('btn-select-machine').disabled = false;
+}
+
+function selectMachine() {
+  if (!state.selectedMachine) return;
+  document.getElementById('selected-machine-name').textContent = state.selectedMachine.name;
+  document.getElementById('code-amount').textContent = `$${state.currentValue.toLocaleString()}`;
+  const code = generateCode();
+  state.validCodes[state.selectedMachine.id] = code;
+  document.getElementById('machine-code').value = '';
+  document.getElementById('validation-result').className = 'validation-result';
+  document.getElementById('validation-result').innerHTML = '';
+  showScreen('screen-code');
+  showToast(`💡 Demo code: ${code}`);
+}
+
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length: 6}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function validateCode() {
+  const input = document.getElementById('machine-code').value.trim().toUpperCase();
+  const validCode = state.validCodes[state.selectedMachine.id];
+  const resultEl = document.getElementById('validation-result');
+  if (input.length < 6) { showToast('⚠️ The code must be 6 characters long'); return; }
+  resultEl.className = 'validation-result show';
+  if (input === validCode) {
+    state.balance += state.currentValue;
+    state.history.push({ product: state.currentProduct.name, value: state.currentValue, machine: state.selectedMachine.name, date: new Date().toLocaleDateString('en-US') });
+    resultEl.classList.add('success');
+    resultEl.innerHTML = `
+      <div class="validation-icon">✅</div>
+      <div class="validation-title">Credits added!</div>
+      <div class="validation-msg"><strong>$${state.currentValue.toLocaleString()}</strong> have been added to your account.<br>Current balance: <strong>$${state.balance.toLocaleString()}</strong></div>
+    `;
+    updateHeaderBalance();
+    setTimeout(() => {
+      showScreen('screen-store');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('tab-store').classList.add('active');
+      updateStoreBalance();
+      renderStore();
+    }, 2500);
+  } else {
+    resultEl.classList.add('error');
+    resultEl.innerHTML = `
+      <div class="validation-icon">❌</div>
+      <div class="validation-title">Incorrect code</div>
+      <div class="validation-msg">Please check the code on the machine's screen and try again.</div>
+    `;
+  }
+}
+
+function updateHeaderBalance() { document.getElementById('header-balance').textContent = `$${state.balance.toLocaleString()}`; }
+function updateStoreBalance() { document.getElementById('store-balance').textContent = `$${state.balance.toLocaleString()}`; }
+
+function renderStore() {
+  const grid = document.getElementById('store-grid');
+  grid.innerHTML = '';
+  STORE_ITEMS.forEach(item => {
+    const redeemed = state.redeemedItems.includes(item.id);
+    const canAfford = state.balance >= item.price;
+    const el = document.createElement('div');
+    el.className = `store-item${redeemed ? ' redeemed' : ''}`;
+    el.innerHTML = `
+      <div class="store-emoji">${item.emoji}</div>
+      <div class="store-name">${item.name}</div>
+      <div class="store-brand">${item.brand}</div>
+      <div class="store-price">$${item.price.toLocaleString()}<span class="store-price-label">credits</span></div>
+      <button class="btn-redeem" onclick="redeemItem('${item.id}', ${item.price}, '${item.name}')"
+        ${!canAfford || redeemed ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+        ${redeemed ? '✓ Redeemed' : canAfford ? 'Redeem' : 'Insufficient balance'}
+      </button>
+    `;
+    grid.appendChild(el);
+  });
+}
+
+function redeemItem(id, price, name) {
+  if (state.balance < price) { showToast('💰 Insufficient balance'); return; }
+  state.balance -= price;
+  state.redeemedItems.push(id);
+  updateHeaderBalance();
+  updateStoreBalance();
+  renderStore();
+  showToast(`🛒 ${name} successfully redeemed!`);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+renderStore();
+updateHeaderBalance();
+startScanner();
+</script>
+</body>
+</html>
